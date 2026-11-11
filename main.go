@@ -23,10 +23,15 @@ import (
 	"log"
 	"net"
 
+	"os"
+
+	"github.com/casbin/casbin-server/auth"
 	pb "github.com/casbin/casbin-server/proto"
 	"github.com/casbin/casbin-server/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
@@ -43,19 +48,46 @@ func recoverInterceptor(ctx context.Context, req interface{}, info *grpc.UnarySe
 
 func main() {
 	var port int
+	var configPath string
 	flag.IntVar(&port, "port", 50051, "listening port")
+	flag.StringVar(&configPath, "config", "config/connection_config.json", "path to the connection/auth config file")
 	flag.Parse()
 
 	if port < 1 || port > 65535 {
 		panic(fmt.Sprintf("invalid port number: %d", port))
 	}
 
+	if envPath := os.Getenv("CONNECTION_CONFIG_PATH"); envPath != "" {
+		configPath = envPath
+	}
+
+	// Fail fast: an enabled-but-tokenless auth config must not start.
+	authenticator, err := auth.NewFromFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// No config file: keep the historical behavior of running
+			// without auth, but make it loud.
+			log.Printf("auth: config file %q not found, authentication disabled", configPath)
+			authenticator = auth.New(auth.DisabledSnapshot())
+		} else {
+			log.Fatalf("auth: invalid config: %v", err)
+		}
+	}
+	stopWatch, err := authenticator.Watch(configPath)
+	if err != nil {
+		log.Printf("auth: hot-reload watcher unavailable: %v", err)
+	} else {
+		defer stopWatch()
+	}
+
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	s := grpc.NewServer(grpc.UnaryInterceptor(recoverInterceptor))
+	s := grpc.NewServer(grpc.ChainUnaryInterceptor(authenticator.UnaryInterceptor(), recoverInterceptor))
 	pb.RegisterCasbinServer(s, server.NewServer())
+	// Register the health service so probes can use the whitelisted check.
+	healthpb.RegisterHealthServer(s, health.NewServer())
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 	log.Println("Listening on", port)

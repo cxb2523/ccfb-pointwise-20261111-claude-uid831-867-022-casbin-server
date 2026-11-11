@@ -8,6 +8,7 @@ require (
 	github.com/casbin/gorm-adapter/v3 v3.14.0
 	github.com/casbin/mongodb-adapter/v3 v3.7.0
 	github.com/casbin/redis-adapter/v3 v3.6.0
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/stretchr/testify v1.8.0
 	google.golang.org/grpc v1.42.0
 	google.golang.org/protobuf v1.27.1
@@ -52,7 +53,7 @@ require (
 	golang.org/x/crypto v0.0.0-20221005025214-4161e89ecf1b // indirect
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
-	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
+	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
